@@ -23,9 +23,8 @@ class Booking extends Model
 
     public function property()
     {
-        return $this->belongsTo(PlaceProperties::class);
+        return $this->belongsTo(PlaceProperties::class, "place_properties_id");
     }
-
     public function owner()
     {
         return $this->belongsTo(User::class, "owner_id");

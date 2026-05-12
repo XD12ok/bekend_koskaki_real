@@ -94,7 +94,7 @@ class BookingController extends Controller
 
         // buat conversation otomatis
         Conversation::create([
-            "booking_id" => $booking->id,
+            "place_property_id" => $property->id,
 
             "user_id" => auth()->id(),
 

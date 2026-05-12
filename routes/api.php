@@ -468,4 +468,7 @@ Route::middleware("auth:sanctum")->group(function () {
         MessageController::class,
         "destroy",
     ])->whereNumber("id");
+
+    //family join
+    Route::post("/family/join", [FamilyController::class, "join"]);
 });

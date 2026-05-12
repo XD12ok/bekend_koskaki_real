@@ -21,7 +21,7 @@ class Conversation extends Model
 
     public function property()
     {
-        return $this->belongsTo(PlaceProperties::class, "place_property_id");
+        return $this->belongsTo(PlaceProperties::class, "place_properties_id");
     }
 
     public function messages()
