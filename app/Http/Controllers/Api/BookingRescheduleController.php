@@ -9,6 +9,47 @@ use Illuminate\Http\Request;
 
 class BookingRescheduleController extends Controller
 {
+    public function index()
+    {
+        $userId = auth()->id();
+
+        $data = BookingRescheduleRequest::with([
+            "booking",
+            "booking.user",
+            "booking.owner",
+            "booking.property",
+        ])
+            ->whereHas("booking", function ($query) use ($userId) {
+                $query->where("user_id", $userId)->orWhere("owner_id", $userId);
+            })
+            ->latest()
+            ->get();
+
+        return response()->json([
+            "data" => $data,
+        ]);
+    }
+
+    public function show($id)
+    {
+        $userId = auth()->id();
+
+        $data = BookingRescheduleRequest::with([
+            "booking",
+            "booking.user",
+            "booking.owner",
+            "booking.property",
+        ])
+            ->whereHas("booking", function ($query) use ($userId) {
+                $query->where("user_id", $userId)->orWhere("owner_id", $userId);
+            })
+            ->findOrFail($id);
+
+        return response()->json([
+            "data" => $data,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $request->validate([

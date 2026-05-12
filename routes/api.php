@@ -18,6 +18,9 @@ use App\Http\Controllers\Api\{
     MessageController,
     BookingController,
     BookingRescheduleController,
+    RentalBookingController,
+    RentalPaymentController,
+    FamilyController,
 };
 
 /*
@@ -29,6 +32,12 @@ use App\Http\Controllers\Api\{
 Route::get("/test", function () {
     return response()->json([
         "message" => "API jalan",
+    ]);
+});
+
+Route::post("/test", function () {
+    return response()->json([
+        "ok" => true,
     ]);
 });
 
@@ -378,5 +387,85 @@ Route::middleware("auth:sanctum")->group(function () {
     Route::post("/booking-reschedules/{id}/cancel", [
         BookingRescheduleController::class,
         "cancel",
+    ])->whereNumber("id");
+
+    /*
+    |--------------------------------------------------------------------------
+    | RENTAL BOOKINGS
+    |--------------------------------------------------------------------------
+    */
+    Route::get("/rental-bookings", [RentalBookingController::class, "index"]);
+    Route::get("/rental-bookings/{id}", [
+        RentalBookingController::class,
+        "show",
+    ])->whereNumber("id");
+    Route::post("/rental-bookings", [RentalBookingController::class, "store"]);
+    Route::post("/rental-bookings/{id}/cancel", [
+        RentalBookingController::class,
+        "cancel",
+    ])->whereNumber("id");
+    /*
+    |--------------------------------------------------------------------------
+    | RENTAL PAYMENTS
+    |--------------------------------------------------------------------------
+    */
+    Route::post("/rental-bookings/{id}/upload-payment", [
+        RentalPaymentController::class,
+        "uploadProof",
+    ])->whereNumber("id");
+    Route::post("/rental-payments/{id}/approve", [
+        RentalPaymentController::class,
+        "approve",
+    ])->whereNumber("id");
+    Route::post("/rental-payments/{id}/reject", [
+        RentalPaymentController::class,
+        "reject",
+    ])->whereNumber("id");
+    /*
+    |--------------------------------------------------------------------------
+    | FAMILY SYSTEM
+    |--------------------------------------------------------------------------
+    */
+    Route::post("/family/join", [FamilyController::class, "join"]);
+
+    /*
+      |--------------------------------------------------------------------------
+      | CONVERSATIONS
+      |--------------------------------------------------------------------------
+      */
+
+    Route::get("/conversations", [ConversationController::class, "index"]);
+
+    Route::post("/conversations", [ConversationController::class, "store"]);
+
+    Route::get("/conversations/{id}", [
+        ConversationController::class,
+        "show",
+    ])->whereNumber("id");
+
+    Route::delete("/conversations/{id}", [
+        ConversationController::class,
+        "destroy",
+    ])->whereNumber("id");
+
+    /*
+      |--------------------------------------------------------------------------
+      | MESSAGES
+      |--------------------------------------------------------------------------
+      */
+
+    Route::get("/conversations/{conversationId}/messages", [
+        MessageController::class,
+        "index",
+    ])->whereNumber("conversationId");
+
+    Route::post("/conversations/{conversationId}/messages", [
+        MessageController::class,
+        "store",
+    ])->whereNumber("conversationId");
+
+    Route::delete("/messages/{id}", [
+        MessageController::class,
+        "destroy",
     ])->whereNumber("id");
 });

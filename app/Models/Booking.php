@@ -21,7 +21,7 @@ class Booking extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function Kost()
+    public function property()
     {
         return $this->belongsTo(PlaceProperties::class);
     }
@@ -38,6 +38,10 @@ class Booking extends Model
 
     public function conversation()
     {
-        return $this->hasOne(Conversation::class);
+        return $this->hasOne(
+            Conversation::class,
+            "place_property_id",
+            "place_properties_id",
+        );
     }
 }
