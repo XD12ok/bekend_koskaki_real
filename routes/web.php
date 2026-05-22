@@ -6,21 +6,19 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Auth\Events\Verified;
 use App\Models\User;
 
-//use Illuminate\Foundation\Auth\EmailVerificationRequest;
-
 Route::get("/email/verify/{id}/{hash}", function (
     Request $request,
     $id,
     $hash,
 ) {
-    // signature valid
+    // cek signature
     if (!URL::hasValidSignature($request)) {
         abort(403, "Invalid or expired link");
     }
 
     $user = User::findOrFail($id);
 
-    // hash email
+    // cek hash email
     if (!hash_equals(sha1($user->getEmailForVerification()), $hash)) {
         abort(403, "Invalid verification hash");
     }
@@ -32,9 +30,7 @@ Route::get("/email/verify/{id}/{hash}", function (
 
         event(new Verified($user));
     }
-    // if (!$user->hasVerifiedEmail()) {
-    //     $user->markEmailAsVerified();
-    // }
 
-    return redirect("koskaki://verified");
+    // tampilkan halaman sukses
+    return view("auth.email-verified");
 })->name("verification.verify");

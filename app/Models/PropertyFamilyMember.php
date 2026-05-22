@@ -13,6 +13,10 @@ class PropertyFamilyMember extends Model
         "joined_at",
     ];
 
+    protected $casts = [
+        "joined_at" => "datetime",
+    ];
+
     public function property()
     {
         return $this->belongsTo(PlaceProperties::class, "place_property_id");

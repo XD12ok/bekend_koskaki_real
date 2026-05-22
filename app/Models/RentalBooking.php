@@ -39,7 +39,7 @@ class RentalBooking extends Model
 
     public function property()
     {
-        return $this->belongsTo(PlaceProperties::class, "place_property_id");
+        return $this->belongsTo(PlaceProperties::class, "place_properties_id");
     }
 
     public function payments()
@@ -50,5 +50,15 @@ class RentalBooking extends Model
     public function inviteCode()
     {
         return $this->hasOne(FamilyInviteCode::class);
+    }
+
+    public function familyMembers()
+    {
+        return $this->hasMany(PropertyFamilyMember::class, "rental_booking_id");
+    }
+
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
     }
 }

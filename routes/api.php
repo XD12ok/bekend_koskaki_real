@@ -21,6 +21,8 @@ use App\Http\Controllers\Api\{
     RentalBookingController,
     RentalPaymentController,
     FamilyController,
+    InvoiceController,
+    ReportController,
 };
 
 /*
@@ -99,6 +101,7 @@ Route::get("/properties/place-properties/{placeId}/features", [
 | CITIES
 |--------------------------------------------------------------------------
 */
+Route::post("/cities", [PlacesController::class, "store"]);
 
 Route::get("/cities", [CitiesController::class, "index"]);
 Route::get("/cities/{city}", [CitiesController::class, "show"])->whereNumber(
@@ -114,6 +117,8 @@ Route::get("/cities/{city}/places", [
 | PLACES
 |--------------------------------------------------------------------------
 */
+
+Route::post("/places/{cityId}", [PlacesController::class, "store"]);
 
 Route::get("/places/{place}", [PlacesController::class, "show"])->whereNumber(
     "place",
@@ -422,13 +427,6 @@ Route::middleware("auth:sanctum")->group(function () {
         "reject",
     ])->whereNumber("id");
     /*
-    |--------------------------------------------------------------------------
-    | FAMILY SYSTEM
-    |--------------------------------------------------------------------------
-    */
-    Route::post("/family/join", [FamilyController::class, "join"]);
-
-    /*
       |--------------------------------------------------------------------------
       | CONVERSATIONS
       |--------------------------------------------------------------------------
@@ -469,6 +467,82 @@ Route::middleware("auth:sanctum")->group(function () {
         "destroy",
     ])->whereNumber("id");
 
-    //family join
-    Route::post("/family/join", [FamilyController::class, "join"]);
+    Route::prefix("family")->group(function () {
+        // join family pakai code
+        Route::post("/join", [FamilyController::class, "join"]);
+
+        // list member berdasarkan property
+        Route::get("/properties/{propertyId}/members", [
+            FamilyController::class,
+            "members",
+        ])->whereNumber("propertyId");
+
+        // detail member
+        Route::get("/properties/{propertyId}/members/{userId}", [
+            FamilyController::class,
+            "memberDetail",
+        ])
+            ->whereNumber("propertyId")
+            ->whereNumber("userId");
+    });
+
+    // keluar dari family sendiri
+    Route::delete("/properties/{propertyId}/leave", [
+        FamilyController::class,
+        "leave",
+    ])->whereNumber("propertyId");
+
+    // owner kick member
+    Route::delete("/properties/{propertyId}/members/{userId}", [
+        FamilyController::class,
+        "kick",
+    ])
+        ->whereNumber("propertyId")
+        ->whereNumber("userId");
+
+    // INVOICES
+    Route::get("/rental-bookings/{id}/invoices", [
+        InvoiceController::class,
+        "index",
+    ]);
+
+    Route::get("/invoices/{id}", [InvoiceController::class, "show"]);
+
+    // MONTHLY PAYMENTS
+    Route::post("/invoice-payments", [
+        InvoiceController::class,
+        "createPayment",
+    ]);
+
+    Route::post("/invoice-payments/{id}/approve", [
+        InvoiceController::class,
+        "approvePayment",
+    ]);
+
+    Route::post("/invoice-payments/{id}/reject", [
+        InvoiceController::class,
+        "rejectPayment",
+    ]);
+
+    // GRACE PERIOD
+    Route::post("/rental-bookings/{id}/grace", [
+        InvoiceController::class,
+        "giveGrace",
+    ]);
+
+    // =========================
+    // REPORTS
+    // =========================
+
+    // total pendapatan
+    Route::get("/reports/total-income", [
+        ReportController::class,
+        "totalIncome",
+    ]);
+
+    // laporan pemasukan
+    Route::get("/reports/income", [ReportController::class, "incomeReport"]);
+
+    // laporan overdue
+    Route::get("/reports/overdue", [ReportController::class, "overdueReport"]);
 });

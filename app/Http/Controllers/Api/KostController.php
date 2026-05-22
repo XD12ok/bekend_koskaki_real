@@ -54,12 +54,17 @@ class KostController extends Controller
             "title" => "required|string|max:255",
             "description" => "required|string",
 
-            "price_per_night" => "nullable|integer|min:0",
-            "price_per_week" => "nullable|integer|min:0",
-            "price_per_month" => "nullable|integer|min:0",
-            "price_per_year" => "nullable|integer|min:0",
+            "price_perNight" => "nullable|integer|min:0",
+            "price_perWeek" => "nullable|integer|min:0",
+            "price_perMonth" => "nullable|integer|min:0",
+            "price_perYear" => "nullable|integer|min:0",
 
             "address" => "required|string",
+
+            // TAMBAHAN GOOGLE MAPS
+            "latitude" => "nullable|numeric",
+            "longitude" => "nullable|numeric",
+
             "city_id" => "required|exists:cities,id",
 
             "max_people" => "required|integer|min:1",
@@ -68,6 +73,15 @@ class KostController extends Controller
         ]);
 
         $validated["owner_id"] = $user->id;
+
+        // BUAT LINK GOOGLE MAPS OTOMATIS
+        if (
+            isset($validated["latitude"]) &&
+            isset($validated["longitude"])
+        ) {
+            $validated["google_maps_link"] =
+                "https://www.google.com/maps?q={$validated["latitude"]},{$validated["longitude"]}";
+        }
 
         $property = PlaceProperties::create($validated);
 
@@ -159,12 +173,25 @@ class KostController extends Controller
 
             "address" => "sometimes|string",
 
+            // TAMBAHAN GOOGLE MAPS
+            "latitude" => "nullable|numeric",
+            "longitude" => "nullable|numeric",
+
             "city_id" => "sometimes|exists:cities,id",
 
             "max_people" => "sometimes|integer|min:1",
 
             "status" => "sometimes|in:active,inactive",
         ]);
+
+        // UPDATE LINK GOOGLE MAPS OTOMATIS
+        if (
+            isset($validated["latitude"]) &&
+            isset($validated["longitude"])
+        ) {
+            $validated["google_maps_link"] =
+                "https://www.google.com/maps?q={$validated["latitude"]},{$validated["longitude"]}";
+        }
 
         $property->update($validated);
 

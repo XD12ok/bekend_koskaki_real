@@ -23,6 +23,9 @@ class PlaceProperties extends Model
         "rating_avg",
         "rating_count",
         "owner_id",
+        'latitude',
+        'longitude',
+        'google_maps_link',
     ];
     public function owner()
     {
@@ -75,5 +78,10 @@ class PlaceProperties extends Model
     public function reviews()
     {
         return $this->hasMany(Reviews::class, "place_properties_id");
+    }
+
+    public function familyMembers()
+    {
+        return $this->hasMany(PropertyFamilyMember::class, "place_property_id");
     }
 }

@@ -78,6 +78,14 @@ class RentalBookingController extends Controller
         $price = 0;
         $endDate = null;
 
+        if ($request->duration_type == "night") {
+            $price = $property->price_perNight;
+
+            $endDate = Carbon::parse($request->start_date)->addNights(
+                (int) $request->duration,
+            );
+        }
+
         if ($request->duration_type == "week") {
             $price = $property->price_perWeek;
 

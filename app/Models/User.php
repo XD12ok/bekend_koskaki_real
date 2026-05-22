@@ -10,6 +10,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Notifications\CustomVerifyEmail;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -30,5 +31,16 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isOwner()
     {
         return $this->role === "owner";
+    }
+
+    public function familyMemberships()
+    {
+        return $this->hasMany(PropertyFamilyMember::class, "user_id");
+    }
+
+    // CUSTOM EMAIL VERIFICATION
+    public function sendEmailVerificationNotification()
+    {
+        $this->notify(new CustomVerifyEmail);
     }
 }

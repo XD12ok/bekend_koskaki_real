@@ -7,16 +7,26 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
-    // REGISTER
+    /*
+    |--------------------------------------------------------------------------
+    | REGISTER
+    |--------------------------------------------------------------------------
+    */
+
     public function register(Request $request)
     {
         $request->validate([
-            "name" => "required",
-            "email" => "required|email:rfc,dns|unique:users",
-            "password" => "required|min:6",
+            "name" => "required|string|max:255",
+
+            "email" => "required|email|unique:users,email",
+
+            "password" => "required|min:8",
+
             "role" => "required|in:residents,owner",
         ]);
 
@@ -27,7 +37,18 @@ class AuthController extends Controller
             "role" => $request->role,
         ]);
 
-        $user->sendEmailVerificationNotification();
+        try {
+            $user->sendEmailVerificationNotification();
+        } catch (\Exception $e) {
+            return response()->json(
+                [
+                    "message" =>
+                        "Register berhasil, tetapi gagal mengirim email verifikasi",
+                    "error" => $e->getMessage(),
+                ],
+                500,
+            );
+        }
 
         return response()->json([
             "message" =>
@@ -35,9 +56,19 @@ class AuthController extends Controller
         ]);
     }
 
-    //login
+    /*
+    |--------------------------------------------------------------------------
+    | LOGIN
+    |--------------------------------------------------------------------------
+    */
+
     public function login(Request $request)
     {
+        $request->validate([
+            "email" => "required|email",
+            "password" => "required",
+        ]);
+
         if (!Auth::attempt($request->only("email", "password"))) {
             return response()->json(
                 [
@@ -49,7 +80,7 @@ class AuthController extends Controller
 
         $user = Auth::user();
 
-        // CEK EMAIL VERIFIED
+        // cek email verified
         if (!$user->hasVerifiedEmail()) {
             return response()->json(
                 [
@@ -59,6 +90,10 @@ class AuthController extends Controller
             );
         }
 
+        // hapus token lama
+        $user->tokens()->delete();
+
+        // buat token baru
         $token = $user->createToken("api-token")->plainTextToken;
 
         return response()->json([
@@ -67,7 +102,13 @@ class AuthController extends Controller
             "user" => $user,
         ]);
     }
-    // RESEND VERIF
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESEND EMAIL VERIFICATION
+    |--------------------------------------------------------------------------
+    */
+
     public function resend(Request $request)
     {
         $request->validate([
@@ -82,51 +123,104 @@ class AuthController extends Controller
             ]);
         }
 
-        $user->sendEmailVerificationNotification();
+        try {
+            $user->sendEmailVerificationNotification();
 
-        return response()->json([
-            "message" => "Email verifikasi dikirim ulang",
-        ]);
+            return response()->json([
+                "message" => "Email verifikasi dikirim ulang",
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(
+                [
+                    "message" => "Gagal mengirim email verifikasi",
+                    "error" => $e->getMessage(),
+                ],
+                500,
+            );
+        }
     }
-    // GET USER (PROTECTED)
+
+    /*
+    |--------------------------------------------------------------------------
+    | GET USER
+    |--------------------------------------------------------------------------
+    */
+
     public function user(Request $request)
     {
         return response()->json($request->user());
     }
 
-    // LOGOUT
+    /*
+    |--------------------------------------------------------------------------
+    | LOGOUT
+    |--------------------------------------------------------------------------
+    */
+
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        if ($request->user()?->currentAccessToken()) {
+            $request->user()->currentAccessToken()->delete();
+        }
 
         return response()->json([
             "message" => "Logout berhasil",
         ]);
     }
 
-    //forgot paswwrod
+    /*
+    |--------------------------------------------------------------------------
+    | FORGOT PASSWORD
+    |--------------------------------------------------------------------------
+    */
+
     public function forgotPassword(Request $request)
     {
         $request->validate([
             "email" => "required|email|exists:users,email",
         ]);
 
-        $status = Password::sendResetLink($request->only("email"));
+        try {
+            $status = Password::sendResetLink(
+                $request->only("email"),
+            );
 
-        return $status === Password::RESET_LINK_SENT
-            ? response()->json([
-                "message" => "Link reset password dikirim ke email",
-            ])
-            : response()->json(["message" => "Gagal mengirim email"], 500);
+            return $status === Password::RESET_LINK_SENT
+                ? response()->json([
+                    "message" =>
+                        "Link reset password dikirim ke email",
+                ])
+                : response()->json(
+                    [
+                        "message" => "Gagal mengirim email",
+                    ],
+                    500,
+                );
+        } catch (\Exception $e) {
+            return response()->json(
+                [
+                    "message" => "Terjadi kesalahan",
+                    "error" => $e->getMessage(),
+                ],
+                500,
+            );
+        }
     }
 
-    //reset password
+    /*
+    |--------------------------------------------------------------------------
+    | RESET PASSWORD
+    |--------------------------------------------------------------------------
+    */
+
     public function resetPassword(Request $request)
     {
         $request->validate([
             "email" => "required|email",
+
             "token" => "required",
-            "password" => "required|min:6|confirmed",
+
+            "password" => "required|min:8|confirmed",
         ]);
 
         $status = Password::reset(
@@ -137,19 +231,28 @@ class AuthController extends Controller
                 "token",
             ),
             function ($user, $password) {
+                // update password
                 $user
                     ->forceFill([
                         "password" => Hash::make($password),
                         "remember_token" => Str::random(60),
                     ])
                     ->save();
+
+                // hapus semua token lama
+                $user->tokens()->delete();
             },
         );
 
         return $status === Password::PASSWORD_RESET
-            ? response()->json(["message" => "Password berhasil direset"])
+            ? response()->json([
+                "message" => "Password berhasil direset",
+            ])
             : response()->json(
-                ["message" => "Token tidak valid atau expired"],
+                [
+                    "message" =>
+                        "Token tidak valid atau expired",
+                ],
                 400,
             );
     }

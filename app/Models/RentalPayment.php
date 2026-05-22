@@ -27,4 +27,9 @@ class RentalPayment extends Model
     {
         return $this->belongsTo(User::class, "verified_by");
     }
+
+    public function invoice()
+    {
+        return $this->belongsTo(Invoice::class);
+    }
 }

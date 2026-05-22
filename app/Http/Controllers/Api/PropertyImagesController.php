@@ -19,13 +19,23 @@ class PropertyImagesController extends Controller
         $this->manager = new ImageManager(new Driver());
     }
 
-    // helper format response
+    // =====================
+    // FORMAT RESPONSE
+    // =====================
+
     private function formatImage($image)
     {
         return [
             "id" => $image->id,
-            "url" => asset("storage/" . $image->url),
+
+            // FULL URL
+            "url" =>
+                "https://koskaki-api.servermbud.online/storage/" . $image->url,
+
+            "path" => $image->url,
+
             "is_main" => $image->is_main,
+
             "properties_id" => $image->properties_id,
         ];
     }
@@ -33,51 +43,76 @@ class PropertyImagesController extends Controller
     // =====================
     // GET ALL IMAGES
     // =====================
+
     public function index($propertyId)
     {
         $images = PropertyImage::where("properties_id", $propertyId)->get();
 
         return response()->json([
+            "success" => true,
+
             "data" => $images->map(fn($img) => $this->formatImage($img)),
         ]);
     }
 
     // =====================
-    // UPLOAD MULTIPLE IMAGES
+    // STORE MULTIPLE IMAGES
     // =====================
-    public function store(Request $request)
+
+    public function store(Request $request, $propertyId)
     {
         $request->validate([
             "images" => "required|array",
+
             "images.*" => "image|mimes:jpg,jpeg,png|max:4096",
         ]);
 
         $existingCount = PropertyImage::where(
             "properties_id",
-            $request->properties_id,
+            $propertyId,
         )->count();
 
         $createdImages = [];
 
         foreach ($request->file("images") as $index => $image) {
+            // =====================
+            // FILE NAME
+            // =====================
+
             $filename = Str::uuid() . ".jpg";
+
             $path = "properties/" . $filename;
+
+            // =====================
+            // COMPRESS IMAGE
+            // =====================
 
             $img = $this->manager->read($image);
 
-            $img->resize(1200, null, function ($constraint) {
-                $constraint->aspectRatio();
-                $constraint->upsize();
-            });
+            $img->scale(width: 1200);
+
+            // =====================
+            // SAVE TO STORAGE
+            // =====================
 
             Storage::disk("public")->put($path, (string) $img->toJpeg(75));
 
+            // =====================
+            // MAIN IMAGE
+            // =====================
+
             $isMain = $existingCount === 0 && $index === 0;
+
+            // =====================
+            // SAVE DB
+            // =====================
 
             $newImage = PropertyImage::create([
                 "url" => $path,
+
                 "is_main" => $isMain,
-                "properties_id" => $propertyId, //dri url
+
+                "properties_id" => $propertyId,
             ]);
 
             $createdImages[] = $this->formatImage($newImage);
@@ -85,7 +120,10 @@ class PropertyImagesController extends Controller
 
         return response()->json(
             [
+                "success" => true,
+
                 "message" => "Images uploaded successfully",
+
                 "data" => $createdImages,
             ],
             201,
@@ -95,6 +133,7 @@ class PropertyImagesController extends Controller
     // =====================
     // DELETE IMAGE
     // =====================
+
     public function destroy($propertyId, $id)
     {
         $image = PropertyImage::where("properties_id", $propertyId)
@@ -109,17 +148,26 @@ class PropertyImagesController extends Controller
 
         $image->delete();
 
+        // =====================
+        // SET NEW MAIN
+        // =====================
+
         if ($wasMain) {
             $newMain = PropertyImage::where(
                 "properties_id",
                 $propertyId,
             )->first();
+
             if ($newMain) {
-                $newMain->update(["is_main" => true]);
+                $newMain->update([
+                    "is_main" => true,
+                ]);
             }
         }
 
         return response()->json([
+            "success" => true,
+
             "message" => "Image deleted successfully",
         ]);
     }
@@ -127,6 +175,7 @@ class PropertyImagesController extends Controller
     // =====================
     // SET MAIN IMAGE
     // =====================
+
     public function setMain($propertyId, $id)
     {
         $image = PropertyImage::where("properties_id", $propertyId)
@@ -137,17 +186,23 @@ class PropertyImagesController extends Controller
             "is_main" => false,
         ]);
 
-        $image->update(["is_main" => true]);
+        $image->update([
+            "is_main" => true,
+        ]);
 
         return response()->json([
+            "success" => true,
+
             "message" => "Main image updated",
+
             "data" => $this->formatImage($image),
         ]);
     }
 
     // =====================
-    // UPDATE (REPLACE IMAGE)
+    // UPDATE IMAGE
     // =====================
+
     public function update(Request $request, $propertyId, $id)
     {
         $request->validate([
@@ -158,28 +213,41 @@ class PropertyImagesController extends Controller
             ->where("id", $id)
             ->firstOrFail();
 
+        // =====================
+        // DELETE OLD IMAGE
+        // =====================
+
         if (Storage::disk("public")->exists($image->url)) {
             Storage::disk("public")->delete($image->url);
         }
 
+        // =====================
+        // NEW IMAGE
+        // =====================
+
         $filename = Str::uuid() . ".jpg";
+
         $path = "properties/" . $filename;
 
         $img = $this->manager->read($request->file("image"));
 
-        $img->resize(1200, null, function ($constraint) {
-            $constraint->aspectRatio();
-            $constraint->upsize();
-        });
+        $img->scale(width: 1200);
 
         Storage::disk("public")->put($path, (string) $img->toJpeg(75));
+
+        // =====================
+        // UPDATE DB
+        // =====================
 
         $image->update([
             "url" => $path,
         ]);
 
         return response()->json([
+            "success" => true,
+
             "message" => "Image updated successfully",
+
             "data" => $this->formatImage($image),
         ]);
     }
