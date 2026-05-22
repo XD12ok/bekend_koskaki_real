@@ -30,7 +30,7 @@
         .check{
             width:100px;
             height:100px;
-            background:#22c55e;
+            background:#0000A3;
             border-radius:50%;
             margin:auto;
             display:flex;
@@ -54,7 +54,7 @@
             display:inline-block;
             margin-top:25px;
             padding:14px 24px;
-            background:#2563eb;
+            background:#0000A3;
             color:white;
             text-decoration:none;
             border-radius:10px;
