@@ -404,6 +404,10 @@ Route::middleware("auth:sanctum")->group(function () {
         RentalBookingController::class,
         "show",
     ])->whereNumber("id");
+    Route::get("/rental-bookings/history", [
+        RentalBookingController::class,
+        "history",
+    ]);
     Route::post("/rental-bookings", [RentalBookingController::class, "store"]);
     Route::post("/rental-bookings/{id}/cancel", [
         RentalBookingController::class,
@@ -468,6 +472,10 @@ Route::middleware("auth:sanctum")->group(function () {
     ])->whereNumber("id");
 
     Route::prefix("family")->group(function () {
+        Route::post("/generate/{bookingId}", [
+            FamilyController::class,
+            "generateCode",
+        ]);
         // join family pakai code
         Route::post("/join", [FamilyController::class, "join"]);
 

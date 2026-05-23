@@ -21,26 +21,45 @@ class RentalPaymentController extends Controller
     {
         $request->validate([
             "payment_proof" => "required|image|max:2048",
-
-            // sekarang tenant bisa partial
             "claimed_amount" => "required|numeric|min:1",
-
             "sender_name" => "nullable|string",
-
             "payment_method" => "nullable|string",
-
             "notes" => "nullable|string",
         ]);
 
         $booking = RentalBooking::findOrFail($id);
 
-        // ambil invoice
-        $invoice = Invoice::where(
-            "rental_booking_id",
-            $booking->id,
-        )->firstOrFail();
+        // =========================
+        // CARI / BUAT INVOICE
+        // =========================
 
-        // invoice sudah lunas
+        $invoice = Invoice::firstOrCreate(
+            [
+                "rental_booking_id" => $booking->id,
+            ],
+            [
+                "period_start" => $booking->start_date,
+
+                "period_end" => $booking->end_date,
+
+                "due_date" => now()->addDays(3),
+
+                "total_amount" => $booking->total_price ?? 0,
+
+                "paid_amount" => 0,
+
+                "remaining_amount" => $booking->total_price ?? 0,
+
+                "status" => "unpaid",
+
+                "billing_cycle" => $booking->duration_type,
+            ],
+        );
+
+        // =========================
+        // CEK SUDAH LUNAS
+        // =========================
+
         if ($invoice->status === "paid") {
             return response()->json(
                 [
@@ -50,7 +69,10 @@ class RentalPaymentController extends Controller
             );
         }
 
-        // claimed tidak boleh melebihi sisa
+        // =========================
+        // CEK OVERPAYMENT
+        // =========================
+
         if ($request->claimed_amount > $invoice->remaining_amount) {
             return response()->json(
                 [
@@ -60,12 +82,18 @@ class RentalPaymentController extends Controller
             );
         }
 
-        // upload proof
+        // =========================
+        // UPLOAD BUKTI
+        // =========================
+
         $proof = $request
             ->file("payment_proof")
             ->store("rental-payments", "public");
 
-        // create payment
+        // =========================
+        // CREATE PAYMENT
+        // =========================
+
         $payment = RentalPayment::create([
             "invoice_id" => $invoice->id,
 
@@ -88,6 +116,10 @@ class RentalPaymentController extends Controller
             "status" => "pending",
         ]);
 
+        // =========================
+        // UPDATE BOOKING
+        // =========================
+
         $booking->update([
             "status" => "waiting_confirmation",
         ]);
@@ -95,12 +127,14 @@ class RentalPaymentController extends Controller
         return response()->json([
             "message" => "Bukti pembayaran berhasil diupload",
 
-            "data" => $payment,
+            "payment" => $payment,
+
+            "invoice" => $invoice,
         ]);
     }
 
     // =========================
-    // APPROVE INITIAL PAYMENT
+    // APPROVE PAYMENT
     // =========================
 
     public function approve(Request $request, $id)
@@ -114,7 +148,10 @@ class RentalPaymentController extends Controller
             "invoice",
         ])->findOrFail($id);
 
-        // sudah approved
+        // =========================
+        // SUDAH APPROVED
+        // =========================
+
         if ($payment->status === "approved") {
             return response()->json(
                 [
@@ -126,9 +163,52 @@ class RentalPaymentController extends Controller
 
         $booking = $payment->rentalBooking;
 
+        // =========================
+        // CEK / BUAT INVOICE
+        // =========================
+
         $invoice = $payment->invoice;
 
-        // overpayment protection
+        if (!$invoice) {
+            // cari invoice berdasarkan booking
+            $invoice = Invoice::where(
+                "rental_booking_id",
+                $booking->id,
+            )->first();
+
+            // kalau belum ada, buat baru
+            if (!$invoice) {
+                $invoice = Invoice::create([
+                    "rental_booking_id" => $booking->id,
+
+                    "period_start" => $booking->start_date,
+
+                    "period_end" => $booking->end_date,
+
+                    "due_date" => now()->addDays(3),
+
+                    "total_amount" => $booking->total_price ?? 0,
+
+                    "paid_amount" => 0,
+
+                    "remaining_amount" => $booking->total_price ?? 0,
+
+                    "status" => "unpaid",
+
+                    "billing_cycle" => $booking->duration_type,
+                ]);
+            }
+
+            // sambungkan payment ke invoice
+            $payment->update([
+                "invoice_id" => $invoice->id,
+            ]);
+        }
+
+        // =========================
+        // CEK OVERPAYMENT
+        // =========================
+
         if ($request->verified_amount > $invoice->remaining_amount) {
             return response()->json(
                 [
@@ -141,9 +221,9 @@ class RentalPaymentController extends Controller
         DB::beginTransaction();
 
         try {
-            // =====================
+            // =========================
             // UPDATE PAYMENT
-            // =====================
+            // =========================
 
             $payment->update([
                 "verified_amount" => $request->verified_amount,
@@ -157,16 +237,19 @@ class RentalPaymentController extends Controller
                 "verified_at" => now(),
             ]);
 
-            // =====================
+            // =========================
             // UPDATE INVOICE
-            // =====================
+            // =========================
 
             $invoice->paid_amount += $request->verified_amount;
 
             $invoice->remaining_amount =
                 $invoice->total_amount - $invoice->paid_amount;
 
-            // invoice lunas
+            // =========================
+            // STATUS INVOICE
+            // =========================
+
             if ($invoice->remaining_amount <= 0) {
                 $invoice->remaining_amount = 0;
 
@@ -177,11 +260,11 @@ class RentalPaymentController extends Controller
 
             $invoice->save();
 
-            // =====================
-            // AKTIFKAN BOOKING
-            // JIKA LUNAS
-            // =====================
+            // =========================
+            // UPDATE BOOKING
+            // =========================
 
+            // booking hanya aktif jika invoice lunas
             if ($invoice->status === "paid") {
                 $booking->update([
                     "status" => "active",
@@ -189,7 +272,10 @@ class RentalPaymentController extends Controller
                     "approved_at" => now(),
                 ]);
 
-                // cegah duplicate invite
+                // =========================
+                // CREATE FAMILY INVITE
+                // =========================
+
                 $hasInvite = FamilyInviteCode::where(
                     "rental_booking_id",
                     $booking->id,
@@ -208,8 +294,10 @@ class RentalPaymentController extends Controller
                 }
             } else {
                 // masih partial
+                // booking tetap waiting confirmation
+
                 $booking->update([
-                    "status" => "partial_payment",
+                    "status" => "waiting_confirmation",
                 ]);
             }
 
@@ -217,6 +305,8 @@ class RentalPaymentController extends Controller
 
             return response()->json([
                 "message" => "Pembayaran berhasil diverifikasi",
+
+                "payment" => $payment,
 
                 "invoice" => $invoice,
             ]);

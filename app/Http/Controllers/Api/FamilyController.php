@@ -7,9 +7,113 @@ use App\Models\FamilyInviteCode;
 use App\Models\PropertyFamilyMember;
 use App\Models\RentalBooking;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class FamilyController extends Controller
 {
+    /*
+    |--------------------------------------------------------------------------
+    | GENERATE FAMILY CODE
+    |--------------------------------------------------------------------------
+    */
+
+    public function generateCode($bookingId)
+    {
+        $authId = auth()->id();
+
+        $booking = RentalBooking::with(["payments", "property"])->findOrFail(
+            $bookingId,
+        );
+
+        // =========================
+        // HANYA PENYEWA UTAMA
+        // =========================
+
+        if ($booking->user_id !== $authId) {
+            return response()->json(
+                [
+                    "message" => "Hanya penyewa utama yang dapat membuat kode",
+                ],
+                403,
+            );
+        }
+
+        // =========================
+        // CEK ADA PAYMENT APPROVED
+        // =========================
+
+        $hasApprovedPayment = $booking
+            ->payments()
+            ->where("status", "approved")
+            ->exists();
+
+        if (!$hasApprovedPayment) {
+            return response()->json(
+                [
+                    "message" =>
+                        "Kode family hanya bisa dibuat setelah pembayaran disetujui",
+                ],
+                422,
+            );
+        }
+
+        // =========================
+        // CEK BOOKING ACTIVE
+        // =========================
+
+        if ($booking->status !== "active") {
+            return response()->json(
+                [
+                    "message" =>
+                        "Booking harus aktif sebelum membuat kode family",
+                ],
+                422,
+            );
+        }
+
+        // =========================
+        // CEK SUDAH ADA KODE AKTIF
+        // =========================
+
+        $existingCode = FamilyInviteCode::where(
+            "rental_booking_id",
+            $booking->id,
+        )
+            ->where(function ($q) {
+                $q->whereNull("expired_at")->orWhere("expired_at", ">", now());
+            })
+            ->latest()
+            ->first();
+
+        if ($existingCode) {
+            return response()->json([
+                "message" => "Kode family sudah tersedia",
+
+                "data" => $existingCode,
+            ]);
+        }
+
+        // =========================
+        // GENERATE CODE
+        // =========================
+
+        $invite = FamilyInviteCode::create([
+            "rental_booking_id" => $booking->id,
+
+            "place_property_id" => $booking->place_property_id,
+
+            "code" => "FAM-" . strtoupper(Str::random(6)),
+
+            "expired_at" => now()->addDays(7),
+        ]);
+
+        return response()->json([
+            "message" => "Kode family berhasil dibuat",
+
+            "data" => $invite,
+        ]);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | JOIN FAMILY
@@ -83,7 +187,6 @@ class FamilyController extends Controller
     {
         $authId = auth()->id();
 
-        // cek apakah user penghuni / owner
         $hasAccess = PropertyFamilyMember::where(
             "place_property_id",
             $propertyId,
@@ -130,13 +233,16 @@ class FamilyController extends Controller
                 "joined_at" => $member->joined_at,
             ];
 
-            // owner bisa lihat detail tambahan
             if ($isOwner && $booking) {
                 $result["rental"] = [
                     "start_date" => $booking->start_date,
+
                     "end_date" => $booking->end_date,
+
                     "days_left" => now()->diffInDays($booking->end_date, false),
+
                     "status" => $booking->status,
+
                     "total_price" => $booking->total_price,
                 ];
             }
@@ -146,7 +252,9 @@ class FamilyController extends Controller
 
         return response()->json([
             "is_owner" => $isOwner,
+
             "total_members" => $members->count(),
+
             "data" => $data,
         ]);
     }
@@ -199,20 +307,26 @@ class FamilyController extends Controller
         if ($booking) {
             $data["rental"] = [
                 "start_date" => $booking->start_date,
+
                 "end_date" => $booking->end_date,
+
                 "days_left" => now()->diffInDays($booking->end_date, false),
+
                 "status" => $booking->status,
+
                 "total_price" => $booking->total_price,
             ];
         }
 
-        // khusus owner
         if ($isOwner && $booking) {
             $data["payment_history"] = $booking->payments->map(function ($p) {
                 return [
                     "amount" => $p->amount,
+
                     "status" => $p->status,
+
                     "method" => $p->payment_method,
+
                     "verified_at" => $p->verified_at,
                 ];
             });
@@ -224,6 +338,12 @@ class FamilyController extends Controller
             "data" => $data,
         ]);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | LEAVE FAMILY
+    |--------------------------------------------------------------------------
+    */
 
     public function leave($propertyId)
     {
@@ -242,7 +362,6 @@ class FamilyController extends Controller
             );
         }
 
-        // owner utama tidak boleh leave
         $booking = $member->rentalBooking;
 
         if ($booking && $booking->user_id == $authId) {
@@ -260,6 +379,13 @@ class FamilyController extends Controller
             "message" => "Berhasil keluar dari family",
         ]);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | KICK MEMBER
+    |--------------------------------------------------------------------------
+    */
+
     public function kick($propertyId, $userId)
     {
         $authId = auth()->id();
@@ -278,7 +404,6 @@ class FamilyController extends Controller
             );
         }
 
-        // hanya owner
         if ($booking->owner_id !== $authId) {
             return response()->json(
                 [
@@ -301,7 +426,6 @@ class FamilyController extends Controller
             );
         }
 
-        // tidak boleh kick penghuni utama
         if ($booking->user_id == $userId) {
             return response()->json(
                 [

@@ -147,4 +147,27 @@ class RentalBookingController extends Controller
             "message" => "Booking dibatalkan",
         ]);
     }
+
+    public function history()
+    {
+        $userId = auth()->id();
+
+        $data = RentalBooking::with(["property", "payments", "owner"])
+            ->where("user_id", $userId)
+
+            // status yang dianggap riwayat
+            ->whereIn("status", [
+                "active",
+                "completed",
+                "partial_payment",
+                "cancelled",
+            ])
+
+            ->latest()
+            ->get();
+
+        return response()->json([
+            "data" => $data,
+        ]);
+    }
 }
