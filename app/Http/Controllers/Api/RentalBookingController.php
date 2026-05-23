@@ -59,7 +59,7 @@ class RentalBookingController extends Controller
             "booking_id" => "required|exists:bookings,id",
             "start_date" => "required|date",
             "duration" => "required|integer|min:1",
-            "duration_type" => "required|in:week,month,year",
+            "duration_type" => "required|in:night,week,month,year",
         ]);
 
         $booking = Booking::with("property")->findOrFail($request->booking_id);
