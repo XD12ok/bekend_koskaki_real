@@ -53,7 +53,7 @@ class InvoiceController extends Controller
 
             "payment_proof" => "required|image|max:2048",
 
-            "payment_type" => "nullable|string",
+            "payment_method" => "nullable|string",
 
             "sender_name" => "nullable|string",
 
@@ -91,11 +91,6 @@ class InvoiceController extends Controller
             );
         }
 
-        // update payment type ke invoice
-        $invoice->update([
-            "payment_type" => $request->payment_type,
-        ]);
-
         // upload proof
         $proof = $request
             ->file("payment_proof")
@@ -110,6 +105,8 @@ class InvoiceController extends Controller
             "claimed_amount" => $request->claimed_amount,
 
             "amount" => $request->claimed_amount,
+
+            "payment_method" => $request->payment_method,
 
             "sender_name" => $request->sender_name,
 
