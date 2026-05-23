@@ -13,6 +13,7 @@ class Invoice extends Model
         "paid_amount",
         "remaining_amount",
         "status",
+        "payment_method",
     ];
 
     public function rentalBooking()
