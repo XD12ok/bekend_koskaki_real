@@ -16,6 +16,7 @@ class RentalPayment extends Model
         "status",
         "verified_by",
         "verified_at",
+        "type",
     ];
 
     public function rentalBooking()

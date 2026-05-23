@@ -34,10 +34,11 @@ class RentalPaymentController extends Controller
 
         $booking = RentalBooking::findOrFail($id);
 
-        // ambil invoice initial
-        $invoice = Invoice::where("rental_booking_id", $booking->id)
-            ->where("type", "initial")
-            ->firstOrFail();
+        // ambil invoice
+        $invoice = Invoice::where(
+            "rental_booking_id",
+            $booking->id,
+        )->firstOrFail();
 
         // invoice sudah lunas
         if ($invoice->status === "paid") {
@@ -73,6 +74,8 @@ class RentalPaymentController extends Controller
             "claimed_amount" => $request->claimed_amount,
 
             "amount" => $request->claimed_amount,
+
+            "type" => "initial",
 
             "payment_method" => $request->payment_method,
 
