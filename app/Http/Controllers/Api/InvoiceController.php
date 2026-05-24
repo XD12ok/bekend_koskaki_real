@@ -41,7 +41,7 @@ class InvoiceController extends Controller
     }
 
     // =========================
-    // CREATE MONTHLY PAYMENT
+    // CREATE PAYMENT
     // =========================
 
     public function createPayment(Request $request)
@@ -78,7 +78,7 @@ class InvoiceController extends Controller
             $invoice->rental_booking_id,
         )
             ->where("id", "!=", $invoice->id)
-            ->whereIn("status", ["unpaid", "partial", "overdue"])
+            ->whereIn("status", ["unpaid", "partial", "overdue", "grace"])
             ->where("period_start", "<", $invoice->period_start)
             ->exists();
 
@@ -188,11 +188,22 @@ class InvoiceController extends Controller
             $invoice->remaining_amount =
                 $invoice->total_amount - $invoice->paid_amount;
 
-            // lunas
+            // =====================
+            // FULLY PAID
+            // =====================
+
             if ($invoice->remaining_amount <= 0) {
                 $invoice->remaining_amount = 0;
 
                 $invoice->status = "paid";
+
+                // reset ke harga asli
+                if ($invoice->original_amount) {
+                    $invoice->total_amount = $invoice->original_amount;
+                }
+
+                // reset penalty
+                $invoice->last_penalty_at = null;
 
                 // update booking
                 $payment->rentalBooking->update([
@@ -203,7 +214,10 @@ class InvoiceController extends Controller
                     "next_payment_date" => $invoice->period_end,
                 ]);
             } else {
-                // partial
+                // =====================
+                // PARTIAL
+                // =====================
+
                 $invoice->status = "partial";
 
                 $payment->rentalBooking->update([
@@ -261,14 +275,62 @@ class InvoiceController extends Controller
 
         $booking = RentalBooking::findOrFail($rentalBookingId);
 
-        $booking->update([
-            "payment_status" => "grace",
+        DB::beginTransaction();
 
-            "grace_until" => $request->grace_until,
-        ]);
+        try {
+            // =====================
+            // UPDATE BOOKING
+            // =====================
 
-        return response()->json([
-            "message" => "Grace period granted",
-        ]);
+            $booking->update([
+                "payment_status" => "grace",
+
+                "grace_until" => $request->grace_until,
+            ]);
+
+            // =====================
+            // GET ACTIVE INVOICE
+            // =====================
+
+            $invoice = Invoice::where("rental_booking_id", $booking->id)
+                ->whereIn("status", ["unpaid", "partial", "overdue"])
+                ->latest()
+                ->first();
+
+            // =====================
+            // UPDATE INVOICE
+            // =====================
+
+            if ($invoice) {
+                // simpan harga asli
+                if (!$invoice->original_amount) {
+                    $invoice->original_amount = $invoice->total_amount;
+                }
+
+                // grace tanpa langsung x2
+                $invoice->update([
+                    "status" => "grace",
+
+                    "last_penalty_at" => now(),
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                "message" => "Grace period granted",
+
+                "invoice" => $invoice,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json(
+                [
+                    "message" => $e->getMessage(),
+                ],
+                500,
+            );
+        }
     }
 }

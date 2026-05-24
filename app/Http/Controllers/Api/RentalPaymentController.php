@@ -7,6 +7,7 @@ use App\Models\FamilyInviteCode;
 use App\Models\Invoice;
 use App\Models\RentalBooking;
 use App\Models\RentalPayment;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -45,6 +46,8 @@ class RentalPaymentController extends Controller
                 "due_date" => now()->addDays(3),
 
                 "total_amount" => $booking->total_price ?? 0,
+
+                "original_amount" => $booking->total_price ?? 0,
 
                 "paid_amount" => 0,
 
@@ -170,13 +173,11 @@ class RentalPaymentController extends Controller
         $invoice = $payment->invoice;
 
         if (!$invoice) {
-            // cari invoice berdasarkan booking
             $invoice = Invoice::where(
                 "rental_booking_id",
                 $booking->id,
             )->first();
 
-            // kalau belum ada, buat baru
             if (!$invoice) {
                 $invoice = Invoice::create([
                     "rental_booking_id" => $booking->id,
@@ -188,6 +189,8 @@ class RentalPaymentController extends Controller
                     "due_date" => now()->addDays(3),
 
                     "total_amount" => $booking->total_price ?? 0,
+
+                    "original_amount" => $booking->total_price ?? 0,
 
                     "paid_amount" => 0,
 
@@ -254,23 +257,71 @@ class RentalPaymentController extends Controller
                 $invoice->remaining_amount = 0;
 
                 $invoice->status = "paid";
-            } else {
-                $invoice->status = "partial";
-            }
 
-            $invoice->save();
+                // reset penalty
+                $invoice->last_penalty_at = null;
 
-            // =========================
-            // UPDATE BOOKING
-            // =========================
+                // reset harga asli
+                if ($invoice->original_amount) {
+                    $invoice->total_amount = $invoice->original_amount;
+                }
 
-            // booking hanya aktif jika invoice lunas
-            if ($invoice->status === "paid") {
+                // =========================
+                // PERPANJANG MASA SEWA
+                // =========================
+
+                $currentEndDate = Carbon::parse($booking->end_date);
+
+                $duration = $booking->duration ?? 1;
+
+                switch ($booking->duration_type) {
+                    case "daily":
+                        $newEndDate = $currentEndDate
+                            ->copy()
+                            ->addDays($duration);
+
+                        break;
+
+                    case "weekly":
+                        $newEndDate = $currentEndDate
+                            ->copy()
+                            ->addWeeks($duration);
+
+                        break;
+
+                    case "monthly":
+                        $newEndDate = $currentEndDate
+                            ->copy()
+                            ->addMonths($duration);
+
+                        break;
+
+                    case "yearly":
+                        $newEndDate = $currentEndDate
+                            ->copy()
+                            ->addYears($duration);
+
+                        break;
+
+                    default:
+                        $newEndDate = $currentEndDate->copy()->addMonth();
+
+                        break;
+                }
+
+                // update booking
                 $booking->update([
                     "status" => "active",
 
                     "approved_at" => now(),
+
+                    "end_date" => $newEndDate,
+
+                    "next_payment_date" => $newEndDate,
                 ]);
+
+                // update invoice
+                $invoice->period_end = $newEndDate;
 
                 // =========================
                 // CREATE FAMILY INVITE
@@ -293,13 +344,15 @@ class RentalPaymentController extends Controller
                     ]);
                 }
             } else {
-                // masih partial
-                // booking tetap waiting confirmation
+                // partial
+                $invoice->status = "partial";
 
                 $booking->update([
                     "status" => "waiting_confirmation",
                 ]);
             }
+
+            $invoice->save();
 
             DB::commit();
 
