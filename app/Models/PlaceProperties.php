@@ -23,9 +23,10 @@ class PlaceProperties extends Model
         "rating_avg",
         "rating_count",
         "owner_id",
-        'latitude',
-        'longitude',
-        'google_maps_link',
+        "latitude",
+        "longitude",
+        "google_maps_link",
+        "maps_address",
     ];
     public function owner()
     {

@@ -7,7 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 class PropertyNearbyPlace extends Model
 {
     protected $table = "property_nearby_places";
-    protected $fillable = ["distance", "place_id", "place_property_id"];
+    protected $fillable = [
+        "distance",
+        "place_id",
+        "place_property_id",
+        "created_at",
+        "updated_at",
+    ];
 
     public function place()
     {

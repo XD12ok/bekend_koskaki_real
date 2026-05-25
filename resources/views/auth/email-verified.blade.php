@@ -82,7 +82,7 @@
         Sekarang akun sudah aktif dan siap digunakan.
     </p>
 
-    <a class="btn" href="koskaki://verified">
+    <a class="btn" href="koskaki://auth/welcome">
         Buka Aplikasi
     </a>
 

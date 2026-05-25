@@ -61,9 +61,9 @@ class KostController extends Controller
 
             "address" => "required|string",
 
-            // TAMBAHAN GOOGLE MAPS
-            "latitude" => "nullable|numeric",
-            "longitude" => "nullable|numeric",
+            // LOCATION
+            "latitude" => "nullable|numeric|between:-90,90",
+            "longitude" => "nullable|numeric|between:-180,180",
 
             "city_id" => "required|exists:cities,id",
 
@@ -74,13 +74,18 @@ class KostController extends Controller
 
         $validated["owner_id"] = $user->id;
 
-        // BUAT LINK GOOGLE MAPS OTOMATIS
-        if (
-            isset($validated["latitude"]) &&
-            isset($validated["longitude"])
-        ) {
+        /*
+        |--------------------------------------------------------------------------
+        | AUTO GOOGLE MAPS LINK
+        |--------------------------------------------------------------------------
+        */
+
+        if (isset($validated["latitude"]) && isset($validated["longitude"])) {
             $validated["google_maps_link"] =
-                "https://www.google.com/maps?q={$validated["latitude"]},{$validated["longitude"]}";
+                "https://www.google.com/maps/search/?api=1&query=" .
+                $validated["latitude"] .
+                "," .
+                $validated["longitude"];
         }
 
         $property = PlaceProperties::create($validated);
@@ -166,16 +171,16 @@ class KostController extends Controller
             "title" => "sometimes|string|max:255",
             "description" => "sometimes|string",
 
-            "price_per_night" => "nullable|integer|min:0",
-            "price_per_week" => "nullable|integer|min:0",
-            "price_per_month" => "nullable|integer|min:0",
-            "price_per_year" => "nullable|integer|min:0",
+            "price_perNight" => "nullable|integer|min:0",
+            "price_perWeek" => "nullable|integer|min:0",
+            "price_perMonth" => "nullable|integer|min:0",
+            "price_perYear" => "nullable|integer|min:0",
 
             "address" => "sometimes|string",
 
-            // TAMBAHAN GOOGLE MAPS
-            "latitude" => "nullable|numeric",
-            "longitude" => "nullable|numeric",
+            // LOCATION
+            "latitude" => "nullable|numeric|between:-90,90",
+            "longitude" => "nullable|numeric|between:-180,180",
 
             "city_id" => "sometimes|exists:cities,id",
 
@@ -184,13 +189,18 @@ class KostController extends Controller
             "status" => "sometimes|in:active,inactive",
         ]);
 
-        // UPDATE LINK GOOGLE MAPS OTOMATIS
-        if (
-            isset($validated["latitude"]) &&
-            isset($validated["longitude"])
-        ) {
+        /*
+        |--------------------------------------------------------------------------
+        | AUTO UPDATE GOOGLE MAPS LINK
+        |--------------------------------------------------------------------------
+        */
+
+        if (isset($validated["latitude"]) && isset($validated["longitude"])) {
             $validated["google_maps_link"] =
-                "https://www.google.com/maps?q={$validated["latitude"]},{$validated["longitude"]}";
+                "https://www.google.com/maps/search/?api=1&query=" .
+                $validated["latitude"] .
+                "," .
+                $validated["longitude"];
         }
 
         $property->update($validated);
@@ -240,6 +250,12 @@ class KostController extends Controller
             "message" => "Data berhasil dihapus",
         ]);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | GET OWNER PROPERTIES
+    |--------------------------------------------------------------------------
+    */
 
     public function myProperties(Request $request)
     {

@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 
@@ -22,11 +22,8 @@ class AuthController extends Controller
     {
         $request->validate([
             "name" => "required|string|max:255",
-
             "email" => "required|email|unique:users,email",
-
             "password" => "required|min:8",
-
             "role" => "required|in:residents,owner",
         ]);
 
@@ -39,6 +36,14 @@ class AuthController extends Controller
 
         try {
             $user->sendEmailVerificationNotification();
+
+            return response()->json(
+                [
+                    "message" =>
+                        "Register berhasil, silakan cek email untuk verifikasi",
+                ],
+                201,
+            );
         } catch (\Exception $e) {
             return response()->json(
                 [
@@ -49,11 +54,6 @@ class AuthController extends Controller
                 500,
             );
         }
-
-        return response()->json([
-            "message" =>
-                "Register berhasil, silakan cek email untuk verifikasi",
-        ]);
     }
 
     /*
@@ -82,6 +82,8 @@ class AuthController extends Controller
 
         // cek email verified
         if (!$user->hasVerifiedEmail()) {
+            Auth::logout();
+
             return response()->json(
                 [
                     "message" => "Email belum diverifikasi",
@@ -181,21 +183,21 @@ class AuthController extends Controller
         ]);
 
         try {
-            $status = Password::sendResetLink(
-                $request->only("email"),
-            );
+            $status = Password::sendResetLink($request->only("email"));
 
-            return $status === Password::RESET_LINK_SENT
-                ? response()->json([
+            if ($status === Password::RESET_LINK_SENT) {
+                return response()->json([
                     "message" =>
-                        "Link reset password dikirim ke email",
-                ])
-                : response()->json(
-                    [
-                        "message" => "Gagal mengirim email",
-                    ],
-                    500,
-                );
+                        "Link reset password berhasil dikirim ke email",
+                ]);
+            }
+
+            return response()->json(
+                [
+                    "message" => "Gagal mengirim link reset password",
+                ],
+                500,
+            );
         } catch (\Exception $e) {
             return response()->json(
                 [
@@ -217,9 +219,7 @@ class AuthController extends Controller
     {
         $request->validate([
             "email" => "required|email",
-
             "token" => "required",
-
             "password" => "required|min:8|confirmed",
         ]);
 
@@ -230,8 +230,8 @@ class AuthController extends Controller
                 "password_confirmation",
                 "token",
             ),
+
             function ($user, $password) {
-                // update password
                 $user
                     ->forceFill([
                         "password" => Hash::make($password),
@@ -239,21 +239,22 @@ class AuthController extends Controller
                     ])
                     ->save();
 
-                // hapus semua token lama
+                // logout semua device
                 $user->tokens()->delete();
             },
         );
 
-        return $status === Password::PASSWORD_RESET
-            ? response()->json([
+        if ($status === Password::PASSWORD_RESET) {
+            return response()->json([
                 "message" => "Password berhasil direset",
-            ])
-            : response()->json(
-                [
-                    "message" =>
-                        "Token tidak valid atau expired",
-                ],
-                400,
-            );
+            ]);
+        }
+
+        return response()->json(
+            [
+                "message" => "Token tidak valid atau sudah expired",
+            ],
+            400,
+        );
     }
 }

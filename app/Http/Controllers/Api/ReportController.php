@@ -15,9 +15,13 @@ class ReportController extends Controller
 
     public function totalIncome()
     {
-        $total = RentalPayment::where("status", "approved")->sum(
-            "verified_amount",
-        );
+        $ownerId = auth()->id();
+
+        $total = RentalPayment::where("status", "approved")
+            ->whereHas("rentalBooking", function ($query) use ($ownerId) {
+                $query->where("owner_id", $ownerId);
+            })
+            ->sum("verified_amount");
 
         return response()->json([
             "total_income" => $total,
@@ -30,10 +34,13 @@ class ReportController extends Controller
 
     public function incomeReport(Request $request)
     {
-        $query = RentalPayment::with(["rentalBooking", "invoice"])->where(
-            "status",
-            "approved",
-        );
+        $ownerId = auth()->id();
+
+        $query = RentalPayment::with(["rentalBooking", "invoice"])
+            ->where("status", "approved")
+            ->whereHas("rentalBooking", function ($query) use ($ownerId) {
+                $query->where("owner_id", $ownerId);
+            });
 
         // filter tanggal
         if ($request->filled("start_date")) {
@@ -61,9 +68,14 @@ class ReportController extends Controller
 
     public function overdueReport()
     {
+        $ownerId = auth()->id();
+
         $invoices = Invoice::with(["rentalBooking", "payments"])
             ->whereIn("status", ["unpaid", "partial", "overdue"])
             ->whereDate("due_date", "<", now())
+            ->whereHas("rentalBooking", function ($query) use ($ownerId) {
+                $query->where("owner_id", $ownerId);
+            })
             ->latest()
             ->get();
 
