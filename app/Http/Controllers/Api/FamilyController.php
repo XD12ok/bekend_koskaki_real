@@ -26,19 +26,6 @@ class FamilyController extends Controller
         );
 
         // =========================
-        // HANYA PENYEWA UTAMA
-        // =========================
-
-        if ($booking->user_id !== $authId) {
-            return response()->json(
-                [
-                    "message" => "Hanya penyewa utama yang dapat membuat kode",
-                ],
-                403,
-            );
-        }
-
-        // =========================
         // CEK ADA PAYMENT APPROVED
         // =========================
 
@@ -364,15 +351,6 @@ class FamilyController extends Controller
 
         $booking = $member->rentalBooking;
 
-        if ($booking && $booking->user_id == $authId) {
-            return response()->json(
-                [
-                    "message" => "Penghuni utama tidak bisa leave",
-                ],
-                422,
-            );
-        }
-
         $member->delete();
 
         return response()->json([
@@ -423,15 +401,6 @@ class FamilyController extends Controller
                     "message" => "Member tidak ditemukan",
                 ],
                 404,
-            );
-        }
-
-        if ($booking->user_id == $userId) {
-            return response()->json(
-                [
-                    "message" => "Penghuni utama tidak bisa di-kick",
-                ],
-                422,
             );
         }
 
